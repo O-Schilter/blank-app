@@ -137,9 +137,34 @@ if uploaded_file:
 
     # Erstelle Plotly-Diagramm
     fig = go.Figure()
+    # Maximum length for a line in question text
+    max_line_length = 60
+
+    # Function to split long text into multiple lines
+    def split_text(text, max_length):
+        if len(text) <= max_length:
+            return text
+        
+        words = text.split()
+        lines = []
+        current_line = words[0]
+        
+        for word in words[1:]:
+            if len(current_line) + len(word) + 1 <= max_length:
+                current_line += " " + word
+            else:
+                lines.append(current_line)
+                current_line = word
+        
+        lines.append(current_line)
+        return "<br>".join(lines)
+
 
     # Berechne cumulative x positions für jeden Balken
     for idx, row in df.iterrows():
+        # Split long question text into multiple lines
+        formatted_idx = split_text(idx, max_line_length)
+        
         # Für jede Kategorie
         for i, col in enumerate(columns_to_use):
             value = df_percentage.loc[idx, col]
@@ -149,10 +174,10 @@ if uploaded_file:
             fig.add_trace(
                 go.Bar(
                     x=[value],
-                    y=[idx],
+                    y=[formatted_idx],  # Use the formatted index with line breaks
                     orientation="h",
                     name=col,
-                    text=int(count) ,
+                    text=int(count),
                     textposition="inside",
                     insidetextanchor="middle",
                     marker=dict(color=colors[i]),
@@ -163,35 +188,21 @@ if uploaded_file:
                 )
             )
 
-    # Für jeden Indikator, füge den Durchschnittswert rechts hinzu
-    for idx, row in df.iterrows():
-        # Basistextformat für den Durchschnitt
+        # Für jeden Indikator, füge den Durchschnittswert rechts hinzu
         avg_text = f"Ø: {row['Durchschnitt']:.2f}"
-
-        # Wenn Vorjahreswerte vorhanden sind und angezeigt werden sollen
+        
+        # Update annotations to use formatted_idx as well
         if has_previous and show_previous:
             change = row["Veränderung"]
             change_symbol = "▲" if change > 0 else "▼" if change < 0 else "○"
             change_sign = "+" if change > 0 else ""
-            change_color = "green" if change > 0 else "red" if change < 0 else "black"
             change_color = "#4a4a4a"
             avg_text = f"Ø: {row['Durchschnitt']:.2f} ({change_symbol} {change_sign}{change:.2f})"
-
-            # Füge Vorjahreswert hinzu
-            # fig.add_annotation(
-            #     x=110,
-            #     y=idx,
-            #     text=f"Vorjahr: {row['Vorheriger Durchschnitt']:.2f}",
-            #     showarrow=False,
-            #     xanchor="left",
-            #     font=dict(size=11, color="gray", family="Arial"),
-            #     align="left",
-            # )
 
         # Füge Durchschnittswert hinzu (mit Veränderung wenn verfügbar)
         fig.add_annotation(
             x=100,
-            y=idx,
+            y=formatted_idx,  # Use the formatted index here too
             text=avg_text,
             showarrow=False,
             xanchor="left",
@@ -203,7 +214,6 @@ if uploaded_file:
             ),
             align="left",
         )
-
     # Layout anpassen
     title_text = "Verteilung der Likert-Skala Antworten" + (
         " mit Vergleich zum Vorjahr" if has_previous and show_previous else ""
@@ -238,8 +248,16 @@ if uploaded_file:
         # ],
     )
 
-    st.plotly_chart(fig, use_container_width=True)
+    config = {
+        'toImageButtonOptions': {
+            'format': 'png',
+            'filename': 'high_res_plot',
+            'scale': 4  # Increase this value for higher resolution
+        }
+    }
 
+    # Display in Streamlit with the custom config
+    st.plotly_chart(fig, use_container_width=True, config=config)
 
     # Tabellarische Darstellung der Daten
     if has_previous and show_previous:
